@@ -111,8 +111,8 @@
     .bar-track{height:14px;background:#e7dfd6;border-radius:999px;overflow:hidden}
     .bar-fill{height:100%;min-width:8px;border-radius:999px;background:linear-gradient(90deg, rgba(217,223,87,.95) 0%, rgba(242,111,120,.78) 100%)}
     .bar-value{text-align:right;font-weight:700;font-size:16px}
-    .chart-box{min-height:440px;display:flex;flex-direction:column}
-    .chart-wrap{flex:1;min-height:380px;padding:12px 42px 4px}
+    .chart-box{min-height:440px;display:flex;flex-direction:column;overflow:hidden}
+    .chart-wrap{flex:1;min-height:380px;padding:12px 42px 4px;overflow:hidden}
     .soft-chart{width:100%;height:100%;display:block;background:var(--card);border-radius:28px;overflow:visible}
     .bottom-grid{display:grid;grid-template-columns:1fr 1fr 1.12fr;gap:22px;margin-top:22px}
     .mini-card{background:var(--card);border:1px solid var(--line);border-radius:32px;padding:22px 24px}
@@ -135,8 +135,8 @@
     @media (max-width: 1120px){
       .hero,.results-grid,.bottom-grid,.recommendation{grid-template-columns:1fr}
       .hero-copy,.hero-visual{min-height:unset}
-      .chart-box{min-height:360px}
-      .chart-wrap{min-height:360px}
+      .chart-box{min-height:260px}
+      .chart-wrap{min-height:240px}
     }
     @media (max-width: 860px){
       .container{width:min(100%, calc(100% - 18px))}
@@ -153,21 +153,10 @@
       .bar-row{grid-template-columns:1fr;gap:8px}
       .results-shell{padding:10px}
       .panel-card{padding:22px 18px}
-      .chart-box{min-height:320px}
-      .chart-wrap{min-height:280px;padding:8px 8px 0}
+      .chart-box{min-height:260px}
+      .chart-wrap{min-height:210px;padding:4px 0 0}
       .recommendation p{font-size:17px}
       .hero-tags span{font-size:14px}
-    }
-    @media (max-width: 480px){
-      .container{width:min(100%, calc(100% - 12px))}
-      .results-shell{padding:8px}
-      .panel-card,.mini-card{padding:18px 14px}
-      .chart-box{min-height:280px}
-      .chart-wrap{min-height:240px;padding:4px 2px 0}
-    }
-    @media (max-width: 860px) and (orientation: landscape){
-      .chart-box{min-height:360px}
-      .chart-wrap{min-height:320px;padding:8px 18px 0}
     }
   </style>
 </head>
@@ -444,55 +433,101 @@ function renderSoftChart(sphereScores){
   const canvas = document.getElementById("softRadarChart");
   const rect = canvas.getBoundingClientRect();
   const ratio = window.devicePixelRatio || 1;
-  const width = Math.max(560, Math.floor(rect.width));
-  const height = Math.max(760, Math.floor(rect.height || 840));
-  canvas.width = width * ratio; canvas.height = height * ratio;
-  canvas.style.width = width + "px"; canvas.style.height = height + "px";
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(ratio,0,0,ratio,0,0);
-  ctx.clearRect(0,0,width,height);
+  const mobile = window.innerWidth <= 860;
+  const portrait = window.innerHeight >= window.innerWidth;
 
-  const cx = width / 2, cy = height / 2 + 6;
-  const maxR = Math.min(width, height) * 0.26;
-  const labelR = maxR + 34;
+  const width = Math.max(220, Math.floor(rect.width || canvas.parentElement.clientWidth || window.innerWidth - 32));
+  const height = Math.max(
+    mobile ? (portrait ? 220 : 240) : 340,
+    Math.floor(rect.height || (mobile ? (portrait ? 220 : 240) : 340))
+  );
+
+  canvas.width = width * ratio;
+  canvas.height = height * ratio;
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
+
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const cx = width / 2;
+  const cy = mobile ? (portrait ? height / 2 - 6 : height / 2 - 2) : height / 2 - 4;
+  const maxR = mobile
+    ? Math.min(width, height) * (portrait ? 0.34 : 0.28)
+    : Math.min(width, height) * 0.29;
+  const labelR = maxR + (mobile ? (portrait ? 18 : 16) : 28);
+
   const points = sphereScores.map((s, i) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * i / sphereScores.length);
     const r = maxR * (s.score / 10);
     return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r, label: s.label };
   });
 
-  ctx.fillStyle = "#f7f4f0"; ctx.fillRect(0,0,width,height);
-  ctx.fillStyle = "rgba(70,66,62,0.14)";
-  for(let x=56; x<width-56; x+=20){ for(let y=56; y<height-56; y+=20){ ctx.beginPath(); ctx.arc(x,y,1.05,0,Math.PI*2); ctx.fill(); } }
+  ctx.fillStyle = "#f7f4f0";
+  ctx.fillRect(0, 0, width, height);
 
-  ctx.strokeStyle = "rgba(50,50,50,0.16)"; ctx.lineWidth = 1;
+  const dotGap = mobile ? 18 : 20;
+  ctx.fillStyle = "rgba(70,66,62,0.14)";
+  for(let x = 24; x < width - 24; x += dotGap){
+    for(let y = 16; y < height - 16; y += dotGap){
+      ctx.beginPath();
+      ctx.arc(x, y, mobile ? 0.9 : 1.05, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.strokeStyle = "rgba(50,50,50,0.16)";
+  ctx.lineWidth = 1;
   sphereScores.forEach((s, i) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * i / sphereScores.length);
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(angle) * (maxR + 10), cy + Math.sin(angle) * (maxR + 10)); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * (maxR + 8), cy + Math.sin(angle) * (maxR + 8));
+    ctx.stroke();
   });
+
   ctx.strokeStyle = "rgba(50,50,50,0.08)";
-  for(let level=1; level<=5; level++){
+  for(let level = 1; level <= 5; level++){
     const r = maxR * (level / 5);
     ctx.beginPath();
     sphereScores.forEach((s, i) => {
       const angle = -Math.PI / 2 + (Math.PI * 2 * i / sphereScores.length);
-      const x = cx + Math.cos(angle) * r, y = cy + Math.sin(angle) * r;
-      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
-    ctx.closePath(); ctx.stroke();
+    ctx.closePath();
+    ctx.stroke();
   }
 
   const path = makeSmoothClosedPath(points);
-  ctx.save(); ctx.filter = "blur(34px)"; ctx.globalAlpha = 0.55; ctx.fillStyle = "rgba(217,223,87,0.34)"; fillPath(ctx, path); ctx.restore();
-  ctx.save(); ctx.filter = "blur(22px)"; ctx.globalAlpha = 0.46; ctx.fillStyle = "rgba(242,111,120,0.28)"; fillPath(ctx, shrinkPath(path, cx, cy, 0.92)); ctx.restore();
-  ctx.save(); ctx.filter = "blur(10px)"; ctx.globalAlpha = 0.58; ctx.fillStyle = "rgba(239,131,179,0.24)"; fillPath(ctx, shrinkPath(path, cx, cy, 0.80)); ctx.restore();
+  ctx.save(); ctx.filter = mobile ? "blur(16px)" : "blur(34px)"; ctx.globalAlpha = 0.55; ctx.fillStyle = "rgba(217,223,87,0.34)"; fillPath(ctx, path); ctx.restore();
+  ctx.save(); ctx.filter = mobile ? "blur(10px)" : "blur(22px)"; ctx.globalAlpha = 0.46; ctx.fillStyle = "rgba(242,111,120,0.28)"; fillPath(ctx, shrinkPath(path, cx, cy, 0.92)); ctx.restore();
+  ctx.save(); ctx.filter = mobile ? "blur(6px)" : "blur(10px)"; ctx.globalAlpha = 0.58; ctx.fillStyle = "rgba(239,131,179,0.24)"; fillPath(ctx, shrinkPath(path, cx, cy, 0.80)); ctx.restore();
   ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = "rgba(217,223,87,0.85)"; fillPath(ctx, shrinkPath(path, cx, cy, 0.88)); ctx.restore();
 
-  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fillStyle = "rgba(29,29,27,.34)"; ctx.fill();
-  ctx.fillStyle = "#2d2a27"; ctx.font = '15px "Miligram","Helvetica Neue",Arial,sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.beginPath();
+  ctx.arc(cx, cy, mobile ? 2.2 : 3, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(29,29,27,.34)";
+  ctx.fill();
+
+  ctx.fillStyle = "#2d2a27";
+  ctx.font = `${mobile ? (portrait ? 8.5 : 9.5) : 13}px "Miligram","Helvetica Neue",Arial,sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
   sphereScores.forEach((s, i) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * i / sphereScores.length);
-    drawWrappedText(ctx, shortenLabel(s.label), cx + Math.cos(angle) * labelR, cy + Math.sin(angle) * labelR, 108, 17);
+    const x = cx + Math.cos(angle) * labelR;
+    const y = cy + Math.sin(angle) * labelR;
+    drawWrappedText(
+      ctx,
+      shortenLabel(s.label),
+      x,
+      y,
+      mobile ? (portrait ? 46 : 54) : 72,
+      mobile ? (portrait ? 10 : 11) : 15
+    );
   });
 }
 function shortenLabel(label){
