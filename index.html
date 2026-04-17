@@ -111,9 +111,9 @@
     .bar-track{height:14px;background:#e7dfd6;border-radius:999px;overflow:hidden}
     .bar-fill{height:100%;min-width:8px;border-radius:999px;background:linear-gradient(90deg, rgba(217,223,87,.95) 0%, rgba(242,111,120,.78) 100%)}
     .bar-value{text-align:right;font-weight:700;font-size:16px}
-    .chart-box{min-height:440px;display:flex;flex-direction:column;overflow:hidden}
-    .chart-wrap{flex:1;min-height:380px;padding:12px 42px 4px;overflow:hidden}
-    .soft-chart{width:100%;height:100%;display:block;background:var(--card);border-radius:28px;overflow:visible}
+    .chart-box{min-height:440px;display:flex;flex-direction:column;overflow:hidden;align-items:center}
+    .chart-wrap{flex:1;min-height:380px;padding:12px 42px 4px;overflow:hidden;width:100%;max-width:100%;display:flex;align-items:center;justify-content:center}
+    .soft-chart{width:100%;height:100%;max-width:100%;display:block;background:var(--card);border-radius:28px}
     .bottom-grid{display:grid;grid-template-columns:1fr 1fr 1.12fr;gap:22px;margin-top:22px}
     .mini-card{background:var(--card);border:1px solid var(--line);border-radius:32px;padding:22px 24px}
     .mini-card h3{margin:0 0 14px;font-size:21px;font-weight:700}
@@ -135,8 +135,8 @@
     @media (max-width: 1120px){
       .hero,.results-grid,.bottom-grid,.recommendation{grid-template-columns:1fr}
       .hero-copy,.hero-visual{min-height:unset}
-      .chart-box{min-height:260px}
-      .chart-wrap{min-height:240px}
+      .chart-box{min-height:240px}
+      .chart-wrap{min-height:220px}
     }
     @media (max-width: 860px){
       .container{width:min(100%, calc(100% - 18px))}
@@ -153,8 +153,8 @@
       .bar-row{grid-template-columns:1fr;gap:8px}
       .results-shell{padding:10px}
       .panel-card{padding:22px 18px}
-      .chart-box{min-height:260px}
-      .chart-wrap{min-height:210px;padding:4px 0 0}
+      .chart-box{min-height:240px}
+      .chart-wrap{min-height:190px;padding:2px 0 0}
       .recommendation p{font-size:17px}
       .hero-tags span{font-size:14px}
     }
@@ -431,19 +431,23 @@ function getMiniInsight(average, strongest, weakest){
 }
 function renderSoftChart(sphereScores){
   const canvas = document.getElementById("softRadarChart");
-  const rect = canvas.getBoundingClientRect();
+  const parent = canvas.parentElement;
   const ratio = window.devicePixelRatio || 1;
   const mobile = window.innerWidth <= 860;
   const portrait = window.innerHeight >= window.innerWidth;
 
-  const width = Math.max(220, Math.floor(rect.width || canvas.parentElement.clientWidth || window.innerWidth - 32));
-  const height = Math.max(
-    mobile ? (portrait ? 220 : 240) : 340,
-    Math.floor(rect.height || (mobile ? (portrait ? 220 : 240) : 340))
-  );
+  const parentWidth = Math.max(220, Math.floor(parent.clientWidth || canvas.clientWidth || window.innerWidth - 24));
+  const sidePadding = mobile ? (portrait ? 8 : 14) : 18;
+  const usableWidth = Math.max(220, parentWidth - sidePadding * 2);
 
-  canvas.width = width * ratio;
-  canvas.height = height * ratio;
+  // Critical fix:
+  // On mobile we render to a square that fits INSIDE the available width,
+  // instead of forcing a large canvas that overflows and becomes off-center.
+  const width = usableWidth;
+  const height = mobile ? usableWidth : Math.max(340, Math.floor(parent.clientHeight || 420));
+
+  canvas.width = Math.floor(width * ratio);
+  canvas.height = Math.floor(height * ratio);
   canvas.style.width = width + "px";
   canvas.style.height = height + "px";
 
@@ -452,16 +456,20 @@ function renderSoftChart(sphereScores){
   ctx.clearRect(0, 0, width, height);
 
   const cx = width / 2;
-  const cy = mobile ? (portrait ? height / 2 - 6 : height / 2 - 2) : height / 2 - 4;
+  const cy = height / 2;
   const maxR = mobile
-    ? Math.min(width, height) * (portrait ? 0.34 : 0.28)
+    ? Math.min(width, height) * (portrait ? 0.29 : 0.25)
     : Math.min(width, height) * 0.29;
-  const labelR = maxR + (mobile ? (portrait ? 18 : 16) : 28);
+  const labelR = maxR + (mobile ? 14 : 28);
+  const labelMaxWidth = mobile ? (portrait ? 50 : 58) : 72;
+  const labelLineHeight = mobile ? (portrait ? 10 : 11) : 15;
+  const fontSize = mobile ? (portrait ? 8.5 : 9.5) : 13;
+  const safePad = mobile ? 10 : 18;
 
   const points = sphereScores.map((s, i) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * i / sphereScores.length);
     const r = maxR * (s.score / 10);
-    return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r, label: s.label };
+    return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r, label: s.label, angle };
   });
 
   ctx.fillStyle = "#f7f4f0";
@@ -469,8 +477,8 @@ function renderSoftChart(sphereScores){
 
   const dotGap = mobile ? 18 : 20;
   ctx.fillStyle = "rgba(70,66,62,0.14)";
-  for(let x = 24; x < width - 24; x += dotGap){
-    for(let y = 16; y < height - 16; y += dotGap){
+  for(let x = safePad; x < width - safePad; x += dotGap){
+    for(let y = safePad; y < height - safePad; y += dotGap){
       ctx.beginPath();
       ctx.arc(x, y, mobile ? 0.9 : 1.05, 0, Math.PI * 2);
       ctx.fill();
@@ -513,21 +521,22 @@ function renderSoftChart(sphereScores){
   ctx.fill();
 
   ctx.fillStyle = "#2d2a27";
-  ctx.font = `${mobile ? (portrait ? 8.5 : 9.5) : 13}px "Miligram","Helvetica Neue",Arial,sans-serif`;
+  ctx.font = `${fontSize}px "Miligram","Helvetica Neue",Arial,sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+
   sphereScores.forEach((s, i) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * i / sphereScores.length);
-    const x = cx + Math.cos(angle) * labelR;
-    const y = cy + Math.sin(angle) * labelR;
-    drawWrappedText(
-      ctx,
-      shortenLabel(s.label),
-      x,
-      y,
-      mobile ? (portrait ? 46 : 54) : 72,
-      mobile ? (portrait ? 10 : 11) : 15
-    );
+    let x = cx + Math.cos(angle) * labelR;
+    let y = cy + Math.sin(angle) * labelR;
+
+    // Clamp label centers so they always stay inside the canvas.
+    const halfW = labelMaxWidth / 2;
+    const halfH = mobile ? 14 : 18;
+    x = Math.max(safePad + halfW, Math.min(width - safePad - halfW, x));
+    y = Math.max(safePad + halfH, Math.min(height - safePad - halfH, y));
+
+    drawWrappedText(ctx, shortenLabel(s.label), x, y, labelMaxWidth, labelLineHeight);
   });
 }
 function shortenLabel(label){
